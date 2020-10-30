@@ -1,0 +1,75 @@
+In this article we are going to see how to use an Amazon Lambda to periodically check if your website is online, and also use CloudWatch and SNS to send SMS alerts when the website if offline.
+
+ Go to your Lambda Console:
+
+    Click Create a Lambda function.
+    Choose NodeJS 4.3 as the Runtime, and hello-world as the blueprint.
+    Click "Next".
+    As the trigger, select a CloudWatch Event with Schedule. Enter a name and description of the rule, and choose an appropiate rate (5 or 15 minutes is usually enough).
+    Click Enable Trigger.
+    Click "Next".
+    Enter a name and description for your new Lamba.
+    Copy and Paste the code from the gist above in the Lambda function code section. Make sure you change the "target" variable to match your website address.
+    In the section Lambda function handler and role choose Create a custom role to create a special role for your Lamba. This is recommended, because it will have its own permissions and wont get mixed with other roles in your account.
+    In the timeout section set a reasonable value, like 30 seconds.
+    Click "Next", and then click "Create function".
+
+
+ Your Lambda should now be up and running, and CloudWatch should be invoking it every few minutes (according to the rate you've setup). You can change how often your Lambda will be invoked in the Triggers tab.
+
+Before proceeding, head to the Code tab and click "Test". Watch the Log output section and make sure everything's working as expected (that would be that the URL you've setup is ok and the Lambda finishes successfully).
+
+
+Create an SNS Topic to send CloudWatch alerts through SMS when your Lambda fails
+
+We are now going to create an SNS Topic to send all the alerts for our Lambda.
+
+The idea is to set a CloudWatch alarm (see below) that when triggered, will send a message through this Topic, and to all the subscribers.
+
+Go to your SNS Console:
+
+    Click Create Topic.
+    Enter a name and description.
+    Once created, click on your new Topic, and then click on Create Subscription.
+    At this point you can actually create any kind of subscription(s) needed for your use case. For this article, we are just going to create an SMS subscription so when your website is offline, Amazon will send you an SMS to your mobile informing so. But Email and HTTP subscriptions can also be added in the same topic, so more complex notifications can be sent and get more people and systems involved!
+    In "Protocol" choose SMS.
+    In "Endpoint" enter your full mobile phone number, including country and area code.
+    Click Create Subscription.
+
+
+
+Setup CloudWatch Alarms to monitor your Lambda and send alerts on errors
+
+In this article you can read more about how to monitor your Lambda logs and invocations with CloudWatch, but here's a quick summary:
+
+CloudWatch is the glue for all what we've done in the earlier steps. It will monitor your lambda executions and act upon any malfunctions. In this case, we are going to setup 2 alarms:
+
+    When your Lambda has any invocations ended in an error.
+    If your Lambda has no invocations at all in the last couple of minutes.
+
+To setup an alarm when your Lambda fails (this could be because of an error in the code itself or because your website is down), go to your CloudWatch Console:
+
+    Click "Alarms" at the left, and then Create Alarm.
+    Click "Lambda Metrics".
+    Look for your Lambda name in the listing, and click on the checkbox for the row where the metric name is "Errors". Click "Next".
+    Enter a name and description for this alarm.
+    Setup the alarm to be triggered whenever "Errors" is above 0, for 1 consecutive period(s).
+    Select "Sum" as the Statistic and 5 minutes (or the amount of minutes that's reasonable for your use case) in the "Period" dropdown.
+    In the "Notification" box, click the Select a notification list dropdown and select your new SNS endpoint.
+    Click "Create Alarm".
+
+
+NOTE: The following can also be donde by adding a notification to the alarm above when in the INSUFFICIENT state, because we actually expect the lambda to be invoked every few minutes periodically.
+
+
+
+
+*** Now create another alarm, but this time we are interested in making sure that your Lambda is invoked every minute:
+
+    Look for your Lambda name in the listing of metrics, and click on the checkbox for the row where the metric name is "Invocations". Click "Next".
+    Enter a name and description for this alarm.
+    Setup the alarm to be triggered whenever "Invocations" is less than 3, for 1 consecutive period(s).
+    Select "Sum" as the Statistic and 5 minutes (or the amount of minutes that's reasonable for your use case) in the "Period" dropdown.
+    In the "Notification" box, click the Select a notification list dropdown and select your new SNS endpoint.
+    Click "Create Alarm".
+
